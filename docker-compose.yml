@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  # DB 1: Database khusus untuk Auth Service (User & Role)
+  user-db:
+    image: mysql:8.0 # atau postgres:16 jika ingin PostgreSQL
+    container_name: dam-user-db
+    restart: always
+    environment:
+      MYSQL_DATABASE: auth_db
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_PASSWORD: userpassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - user_db_data:/var/lib/mysql
+    networks:
+      - dam-network
+
+  # DB 2: Database khusus untuk Main/Project Service (Metadata Aset DAM)
+  project-db:
+    image: mysql:8.0 # atau postgres:16
+    container_name: dam-project-db
+    restart: always
+    environment:
+      MYSQL_DATABASE: project_db
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_PASSWORD: projectpassword
+    ports:
+      - "3307:3306" # Dipindah ke port 3307 agar tidak bentrok dengan DB 1
+    volumes:
+      - project_db_data:/var/lib/mysql
+    networks:
+      - dam-network
+
+networks:
+  dam-network:
+    driver: bridge
+
+volumes:
+  user_db_data:
+  project_db_data:
