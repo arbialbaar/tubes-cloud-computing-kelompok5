@@ -57,6 +57,16 @@ class AuthController extends Controller
         return response()->json(['message' => 'Berhasil logout']);
     }
 
+    public function validateToken()
+    {
+        // Jika request sampai sini, berarti token sudah lolos middleware auth:api
+        // (tidak kedaluwarsa & tidak ada di blacklist)
+        return response()->json([
+            'valid' => true,
+            'user'  => auth()->guard('api')->user()
+        ], 200);
+    }
+
     public function me()
     {
         return response()->json(auth()->guard('api')->user());
