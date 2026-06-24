@@ -17,6 +17,7 @@
         .nav-link { color: rgba(255,255,255,0.85); text-decoration: none; font-size: 14px; padding: 6px 12px; border-radius: 6px; }
         .nav-link:hover { background: rgba(255,255,255,0.15); }
         .logout-btn { background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4); padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+        .user-info { color: rgba(255,255,255,0.9); font-size: 13px; }
         .container { max-width: 1100px; margin: 32px auto; padding: 0 24px; }
         .alert { padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; }
         .alert-success { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
@@ -35,6 +36,7 @@
         .btn-info { background: #eff6ff; color: #1d4ed8; }
         .btn-warning { background: #fef3c7; color: #d97706; }
         .btn-sm { padding: 6px 12px; font-size: 12px; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         table { width: 100%; border-collapse: collapse; }
         th { background: #f8fafc; padding: 12px 16px; text-align: left; font-size: 13px; color: #555; border-bottom: 2px solid #e2e8f0; }
         td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; font-size: 14px; color: #444; vertical-align: middle; }
@@ -45,6 +47,7 @@
         .badge-video { background: #fce7f3; color: #9d174d; }
         .badge-audio { background: #d1fae5; color: #065f46; }
         .badge-lainnya { background: #f3f4f6; color: #6b7280; }
+        .owner-badge { background: #f3f4f6; color: #6b7280; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
         .actions { display: flex; gap: 6px; flex-wrap: wrap; }
         .preview-thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; border: 1px solid #e2e8f0; }
         .preview-icon { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: #f3f4f6; border-radius: 6px; font-size: 24px; }
@@ -66,6 +69,7 @@
     <div class="nav-links">
         <a href="{{ route('dashboard') }}" class="nav-link">🏠 Dashboard</a>
         <a href="{{ route('assets.index') }}" class="nav-link">📁 Aset</a>
+        <span class="user-info">👤 {{ session('user.name') }} ({{ session('user.role') }})</span>
         <form method="POST" action="{{ route('logout') }}" style="margin:0">
             @csrf
             <button type="submit" class="logout-btn">Logout</button>
@@ -84,12 +88,11 @@
         <div class="alert alert-share">
             🔗 <strong>Link Sharing (bisa dibagikan tanpa login):</strong><br><br>
             <a href="{{ session('share_link') }}" target="_blank">{{ session('share_link') }}</a>
-            <br><br>
-            <small>Klik link di atas untuk download langsung</small>
         </div>
     @endif
 
-    {{-- Upload Form --}}
+    {{-- Upload Form (hanya Admin & Kontributor) --}}
+    @if(in_array(session('user.role'), ['Admin', 'Kontributor']))
     <div class="card">
         <h2>📤 Upload Aset Digital</h2>
         <form method="POST" action="{{ route('assets.store') }}" enctype="multipart/form-data">
@@ -97,12 +100,12 @@
             <div class="form-row">
                 <div class="form-group">
                     <label>Nama Aset (opsional)</label>
-                    <input type="text" name="name" placeholder="Nama file (tanpa ekstensi)">
+                    <input type="text" name="name" placeholder="Nama file">
                 </div>
                 <div class="form-group">
                     <label>Kategori <span style="color:red">*</span></label>
                     <select name="category" required>
-                        <option value="" disabled selected>-- Pilih Kategori --</option>
+                        <option value="" disabled selected>-- Pilih --</option>
                         <option value="Gambar">🖼️ Gambar</option>
                         <option value="Dokumen">📄 Dokumen</option>
                         <option value="Video">🎬 Video</option>
@@ -116,22 +119,23 @@
                     <label>File <span style="color:red">*</span></label>
                     <input type="file" name="file" required>
                 </div>
-		<div class="form-group">
-    		    <label>Ganti File (opsional)</label>
-    		    <input type="file" name="file">
-		</div>
                 <div class="form-group">
                     <label>Tags (pisahkan dengan koma)</label>
                     <input type="text" name="tags" placeholder="desain, logo, 2024">
                 </div>
             </div>
-            <button type="submit" class="btn btn-primary">📤 Upload Aset</button>
+            <button type="submit" class="btn btn-primary">📤 Upload</button>
         </form>
     </div>
+    @else
+    <div class="card" style="background:#eff6ff;border:1px solid #bfdbfe">
+        <p style="color:#1d4ed8">🔒 <strong>Akses Terbatas:</strong> Role Client hanya bisa melihat dan mengunduh aset yang dibagikan.</p>
+    </div>
+    @endif
 
     {{-- Asset List --}}
     <div class="card">
-        <h2>📁 Daftar Aset Digital
+        <h2>📁 Daftar Aset
             <span style="background:#f3f4f6;color:#666;padding:3px 10px;border-radius:12px;font-size:13px;margin-left:8px;">
                 {{ count($assets) }} aset
             </span>
@@ -147,11 +151,17 @@
                     <th>Tags</th>
                     <th>Ukuran</th>
                     <th>Versi</th>
+                    <th>Pembuat</th>
                     <th>Aksi</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach($assets as $asset)
+                @php
+                    $isOwner = $asset['user_email'] === session('user.email');
+                    $isAdmin = session('user.role') === 'Admin';
+                    $canEdit = $isAdmin || $isOwner;
+                @endphp
                 <tr>
                     <td>
                         @if(str_contains($asset['file_type'] ?? '', 'image'))
@@ -161,10 +171,6 @@
                             <div class="preview-icon" style="display:none">🖼️</div>
                         @elseif(str_contains($asset['file_type'] ?? '', 'pdf'))
                             <div class="preview-icon">📄</div>
-                        @elseif(str_contains($asset['file_type'] ?? '', 'video'))
-                            <div class="preview-icon">🎬</div>
-                        @elseif(str_contains($asset['file_type'] ?? '', 'audio'))
-                            <div class="preview-icon">🎵</div>
                         @else
                             <div class="preview-icon">📦</div>
                         @endif
@@ -192,20 +198,34 @@
                     </td>
                     <td><span class="version-badge">v{{ $asset['version'] ?? 1 }}</span></td>
                     <td>
+                        <span class="owner-badge">
+                            @if($isOwner) 📍 Kamu @else 👤 {{ substr($asset['user_email'], 0, 15) }}... @endif
+                        </span>
+                    </td>
+                    <td>
                         <div class="actions">
+                            {{-- Edit (hanya owner atau admin) --}}
+                            @if($canEdit)
                             <button class="btn btn-warning btn-sm"
                                 onclick="openEdit({{ $asset['id'] }}, '{{ addslashes($asset['file_name']) }}', '{{ $asset['category'] }}', '{{ addslashes($asset['tags'] ?? '') }}')">
-                                ✏️ Edit
+                                ✏️
                             </button>
+                            @endif
+
+                            {{-- Share (semua bisa) --}}
                             <form method="POST" action="{{ route('assets.share', $asset['id']) }}" style="margin:0">
                                 @csrf
-                                <button type="submit" class="btn btn-info btn-sm">🔗 Share</button>
+                                <button type="submit" class="btn btn-info btn-sm">🔗</button>
                             </form>
+
+                            {{-- Delete (hanya owner atau admin) --}}
+                            @if($canEdit)
                             <form method="POST" action="{{ route('assets.destroy', $asset['id']) }}" style="margin:0"
                                 onsubmit="return confirm('Hapus aset ini?')">
                                 @csrf
-                                <button type="submit" class="btn btn-danger btn-sm">🗑️ Hapus</button>
+                                <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
                             </form>
+                            @endif
                         </div>
                     </td>
                 </tr>
@@ -215,7 +235,13 @@
         @else
         <div class="empty-state">
             <div class="icon">📭</div>
-            <p>Belum ada aset. Upload file pertama kamu!</p>
+            <p>
+                @if(session('user.role') === 'Client')
+                    Tidak ada aset yang dibagikan ke Anda.
+                @else
+                    Belum ada aset. Mulai dengan upload file!
+                @endif
+            </p>
         </div>
         @endif
     </div>
@@ -225,7 +251,7 @@
 <div class="modal-overlay" id="editModal">
     <div class="modal">
         <h3>✏️ Edit Aset</h3>
-        <form method="POST" id="editForm"<form method="POST" id="editForm" enctype="multipart/form-data">
+        <form method="POST" id="editForm" enctype="multipart/form-data">
             @csrf
             <div class="form-group">
                 <label>Nama Aset</label>
@@ -242,8 +268,12 @@
                 </select>
             </div>
             <div class="form-group">
+                <label>Ganti File (opsional — akan menaikkan versi)</label>
+                <input type="file" name="file">
+            </div>
+            <div class="form-group">
                 <label>Tags (pisahkan dengan koma)</label>
-                <input type="text" name="tags" id="editTags" placeholder="desain, logo, 2024">
+                <input type="text" name="tags" id="editTags" placeholder="desain, logo">
             </div>
             <div class="modal-actions">
                 <button type="button" class="btn btn-danger" onclick="closeEdit()">Batal</button>
