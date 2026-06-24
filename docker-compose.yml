@@ -11,12 +11,19 @@ services:
     environment:
       MYSQL_DATABASE: auth_db
       MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_USER: authuser
+      MYSQL_PASSWORD: authpassword
     ports:
       - "3306:3306"
     volumes:
       - user_db_data:/var/lib/mysql
     networks:
       - dam-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
 
   project-db:
     image: mysql:8.0
@@ -25,29 +32,37 @@ services:
     environment:
       MYSQL_DATABASE: project_db
       MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_USER: projectuser
+      MYSQL_PASSWORD: projectpassword
     ports:
       - "3307:3306"
     volumes:
       - project_db_data:/var/lib/mysql
     networks:
       - dam-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
 
   # ----------------------------------------
   # 2. APPLICATION SERVICES
   # ----------------------------------------
   auth-service:
     build:
-      context: ./auth-service # Mengambil instruksi dari Dockerfile di folder auth-service
+      context: ./auth-service
     container_name: dam-auth-service
     restart: always
     ports:
-      - "8001:8000" # Expose ke port 8001
+      - "8001:8000"
     depends_on:
-      - user-db
+      user-db:
+        condition: service_healthy
     networks:
       - dam-network
     environment:
-      - APP_KEY=base64:eyCKOBFQrSByz7jGLq7Nrhu5vhgVHrnJRcSUwgvGEKc=
+      - APP_KEY=base64:v+G3rSYzuw+xupj4C7PnAJ+W/lCjqlMxoNZ+q+LOze8=
       - APP_ENV=local
       - APP_DEBUG=true
       - DB_CONNECTION=mysql
@@ -60,17 +75,18 @@ services:
 
   project-service:
     build:
-      context: ./project-service # Mengambil instruksi dari Dockerfile di folder project-service
+      context: ./project-service
     container_name: dam-project-service
     restart: always
     ports:
-      - "8002:8000" # Expose ke port 8002
+      - "8002:8000"
     depends_on:
-      - project-db
+      project-db:
+        condition: service_healthy
     networks:
       - dam-network
     environment:
-      - APP_KEY=base64:K5qwjnFVFFNNN3tRHVltbX0hyLWGDvns7JYjVtIlS2U=
+      - APP_KEY=base64:wwCCZ/12FVIXQuL/Y5HUgz/CPZnCI3Xb2egZJVMKjM4=
       - APP_ENV=local
       - APP_DEBUG=true
       - DB_CONNECTION=mysql
@@ -83,20 +99,22 @@ services:
 
   gateway-service:
     build:
-      context: ./gateway-service # Mengambil instruksi dari Dockerfile di folder gateway-service
+      context: ./gateway-service
     container_name: dam-gateway-service
     restart: always
     ports:
-      - "8000:8000" # Pintu masuk utama dari Postman/Browser
+      - "8000:8000"
     depends_on:
       - auth-service
       - project-service
     networks:
       - dam-network
     environment:
-      - APP_KEY=base64:K5qwjnFVFFNNN3tRHVltbX0hyLWGDvns7JYjVtIlS2U=
+      - APP_KEY=base64:mWfrC14/3sPcBYq0nzUzGKE1dwKmR7zZ5O1YGUslXe0=
       - APP_ENV=local
       - APP_DEBUG=true
+      - SESSION_DRIVER=file
+      - CACHE_DRIVER=file
       - AUTH_SERVICE_URL=http://dam-auth-service:8000
       - PROJECT_SERVICE_URL=http://dam-project-service:8000
 

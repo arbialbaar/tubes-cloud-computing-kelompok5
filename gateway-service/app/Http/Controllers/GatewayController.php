@@ -12,7 +12,12 @@ class GatewayController extends Controller
      */
     public function proxyToAuth(Request $request)
     {
-        $url = env('AUTH_SERVICE_URL', 'http://127.0.0.1:8001') . $request->getRequestUri();
+        $uri = $request->getRequestUri();
+        // Ubah /api/auth menjadi /api untuk disesuaikan dengan routing internal auth-service
+        if (str_starts_with($uri, '/api/auth')) {
+            $uri = '/api' . substr($uri, 9);
+        }
+        $url = env('AUTH_SERVICE_URL', 'http://dam-auth-service:8000') . $uri;
         return $this->forwardRequest($request, $url);
     }
 
@@ -21,7 +26,7 @@ class GatewayController extends Controller
      */
     public function proxyToProject(Request $request)
     {
-        $url = env('PROJECT_SERVICE_URL', 'http://127.0.0.1:8002') . $request->getRequestUri();
+        $url = env('PROJECT_SERVICE_URL', 'http://dam-project-service:8000') . $request->getRequestUri();
         return $this->forwardRequest($request, $url);
     }
 
@@ -41,6 +46,11 @@ class GatewayController extends Controller
                 continue;
             }
             $headers[$key] = implode(', ', $values);
+        }
+
+        // Auto-inject token JWT dari Session jika request berasal dari front-end browser
+        if (!isset($headers['Authorization']) && \Illuminate\Support\Facades\Session::has('token')) {
+            $headers['Authorization'] = 'Bearer ' . \Illuminate\Support\Facades\Session::get('token');
         }
 
         // 2. Cek apakah ada file yang dikirim

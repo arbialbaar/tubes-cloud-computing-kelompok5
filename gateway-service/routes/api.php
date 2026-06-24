@@ -14,19 +14,8 @@ use App\Http\Controllers\GatewayController;
 // ==========================================
 // 1. ROUTING UNTUK AUTH SERVICE (Port 8001)
 // ==========================================
-Route::any('/auth/{any}', function (Request $request, $any) {
-    // Mengambil URL internal Auth Service dari file .env
-    $authUrl = env('AUTH_SERVICE_URL', 'http://127.0.0.1:8001');
-
-    // Meneruskan request beserta method, headers, dan body data
-    $response = Http::withHeaders($request->headers->all())
-        ->send($request->method(), $authUrl . '/api/' . $any, [
-            'body'  => $request->getContent(),
-            'query' => $request->query()
-        ]);
-
-    return response()->json($response->json(), $response->status());
-})->where('any', '.*');
+Route::any('/auth/{any?}', [GatewayController::class, 'proxyToAuth'])
+    ->where('any', '.*');
 
 
 // ==========================================
